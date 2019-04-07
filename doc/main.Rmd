@@ -65,8 +65,15 @@ if (!require("pacman")) {
   install_github("trinker/pacman")
 }
 
+if (!require("tm")) install.packages("tm")
+if (!require("tidytext")) install.packages("tidytext")
+library(tm)
+library(dplyr)
+library(tidyr)
+library(tidytext)
+
 pacman::p_load(knitr, readr, stringr, tesseract, vecsets)
-source('../lib/ifCleanToken.R')
+# source('../lib/ifCleanToken.R')
 file_name_vec <- list.files("../data/ground_truth") #100 files in total
 ```
 
@@ -90,41 +97,58 @@ for(i in c(1:length(file_name_vec))){
 ```
 
 # Step 3 - Error detection
-
-Now, we are ready to conduct post-processing, based on the Tessearct OCR output. First of all, we need to detect errors, or *incorrectly processed words* -- check to see if an input string is a valid dictionary word or if its n-grams are all legal.
-
-The referenced papers are:
-
-1. [Rule-based techniques](http://webpages.ursinus.edu/akontostathis/KulpKontostathisFinal.pdf)
-
-- rules are in the section 2.2 
-
-2. [Letter n-gram](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=1672564)
-
-- focus on positional binary digram in section 3-a.error detection
-
-3. Probabilistic techniques -- [SVM garbage detection](https://dl.acm.org/citation.cfm?doid=2034617.2034626)
-
-- features are in section 5 (you can choose not to implement ‘Levenshtein distance’ feature)
-
-
-In this statercode, we implement the first three rules in the first paper -- rule based techniques, as an example.
-
+## 3.1 
+### 3.1.1 Use train data to create LB corpus
 ```{r}
-### only process one of the files in the folder as an example, in your project, you need to use all the files
-current_file_name <- sub(".txt","",file_name_vec[5])
+set.seed(2019)
+train_index <- sample(1:100, 80, replace = F)
+# bigr_list: a list of 80 file names
+bigr_list <- file_name_vec[train_index]
+read_txt <- function(file_name){
+  current_file_name <- sub(".txt","",file_name)
+  current_ground_truth <- readLines(paste("../data/ground_truth/",current_file_name,".txt",sep=""), encoding="UTF-8",warn=FALSE)
+  return(current_ground_truth)
+}
 
-## read the ground truth text
-current_ground_truth_txt <- readLines(paste("../data/ground_truth/",current_file_name,".txt",sep=""), warn=FALSE)
-
-## read the tesseract text
-current_tesseract_txt <- readLines(paste("../data/tesseract/",current_file_name,".txt",sep=""), warn=FALSE)
-clean_tesseract_txt <- paste(current_tesseract_txt, collapse = " ")
-
-## detect tesseract word error
-tesseract_vec <- str_split(clean_tesseract_txt," ")[[1]] #1124 tokens
-tesseract_if_clean <- unlist(lapply(tesseract_vec,ifCleanToken)) # source code of ifCleanToken in in lib folder
+bigr_lib <- lapply(bigr_list, read_txt)
+  
+corpus<-VCorpus(VectorSource(bigr_lib))%>%
+    tm_map(content_transformer(tolower))%>%
+    tm_map(removePunctuation)%>%
+    tm_map(removeNumbers)%>%
+    tm_map(removeWords, character(0))%>%
+    tm_map(stripWhitespace)
+dict <- tidy(corpus) %>%
+  select(text)  
+data("stop_words")
+completed <- dict %>%
+  mutate(id = bigr_list)  %>%
+  unnest_tokens(dictionary, text) %>%
+  anti_join(stop_words,by = c("dictionary" = "word")) 
+list <- completed$dictionary
+source('../lib/feature_extraction.R')
+Lb <- unlist(lapply(list,bigram)) #778458 elements
+LB <- data.frame(table(Lb))
 ```
+
+### 3.1.2 Obtain ocr data and extract the features
+```{r}
+tesseract_if_clean <- read.csv("../output/ocr_output.csv")
+
+feature_names <- paste("feature", 1:13)
+features <- matrix(nrow =nrow(tesseract_if_clean),  ncol = 13)
+for(i in 1:nrow(tesseract_if_clean)){
+  features[i,] <- tesseract_if_clean$tokens[i] %>% as.character() %>% findfeatures() 
+}
+
+colnames(features) <- feature_names
+features <- cbind(tesseract_if_clean, features)
+
+save(features, file="../output/features.RData")
+write.csv(features, file="../output/features.csv")
+# load("../output/features.RData")
+```
+
 
 # Step 4 - Error correction
 
