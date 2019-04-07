@@ -127,8 +127,8 @@ completed <- dict %>%
   anti_join(stop_words,by = c("dictionary" = "word")) 
 list <- completed$dictionary
 source('../lib/feature_extraction.R')
-word <- unlist(lapply(list,bigram)) #778458 elements
-LB <- data.frame(table(word))
+Lb <- unlist(lapply(list,bigram)) #778458 elements
+LB <- data.frame(table(Lb))
 ```
 
 ### 3.1.2 Obtain ocr data and extract the features
