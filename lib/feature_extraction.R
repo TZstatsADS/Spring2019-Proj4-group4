@@ -15,9 +15,8 @@ bigram <- function(token){
 
 
 freq_bigr = function(bigr, LB){
-  # ifelse(sum(bigr != 0), return(LB$Freq[bigr == LB$Lb]), return("0"))
   freq = LB$Freq[bigr == LB$Lb]
-  ifelse(length(freq)!=0, return(freq), return(0))
+  return(ifelse(length(freq)!=0, freq, 0))
 }
 
 
