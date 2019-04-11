@@ -3,9 +3,6 @@ if (!require("stringr")) install.packages("stringr")
 library(NLP)
 library(stringr)
 
-
-# token = "Wrldfoooiaehr70).'"
-
 bigram <- function(token){
   ## Split into characterss:
   w <- strsplit(token, "")[[1]]
@@ -18,11 +15,6 @@ freq_bigr = function(bigr, LB){
   freq = LB$Freq[bigr == LB$Lb]
   return(ifelse(length(freq)!=0, freq, 0))
 }
-
-
-#x <- c("ac", "ad", "oo","ae","r7","ii")
-#y <- c(3,4,6,7,9,2)
-#LB <- data.frame(word =x ,freq = y )
 
 
 findfeatures <- function(token){
@@ -84,9 +76,4 @@ findfeatures <- function(token){
   ### return features
   return(unlist(features))
 }
-
-# findfeatures(token)
-
-
-
 

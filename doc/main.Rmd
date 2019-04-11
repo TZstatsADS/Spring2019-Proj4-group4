@@ -10,8 +10,9 @@ output:
     number_sections: true
     code_folding: hide
 ---
+Group 10:
 
-Jing Wu
+Xinyi, Ziyi, Sitong, Weixuan, Caihui
 
 GU4243/GR5243: Applied Data Science
 
@@ -134,6 +135,7 @@ LB <- data.frame(table(Lb))
 ### 3.1.2 Obtain ocr data and extract the features
 ```{r}
 tesseract_if_clean <- read.csv("../output/ocr_output.csv")
+head(tesseract_if_clean)
 
 feature_names <- paste("feature", 1:13)
 features <- matrix(nrow =nrow(tesseract_if_clean),  ncol = 13)
@@ -144,8 +146,8 @@ for(i in 1:nrow(tesseract_if_clean)){
 colnames(features) <- feature_names
 features <- cbind(tesseract_if_clean, features)
 
-save(features, file="../output/features.RData")
-write.csv(features, file="../output/features.csv")
+# save(features, file="../output/features.RData")
+# write.csv(features, file="../output/features.csv")
 # load("../output/features.RData")
 ```
 
