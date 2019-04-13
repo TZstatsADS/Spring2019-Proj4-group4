@@ -1,0 +1,536 @@
+---
+title: 'Optical character recognition (OCR)'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+    code_folding: hide
+---
+
+Group 4
+
+GU4243/GR5243: Applied Data Science
+
+<style type="text/css">
+h1.title {
+  font-size: 24px;
+  color: Black;
+}
+h1 { /* Header 1 */
+  font-size: 24px;
+  color: Black;
+}
+h2 { /* Header 2 */
+  font-size: 20px;
+  color: Black;
+}
+h3 { /* Header 3 */
+  font-size: 16px;
+  color: Black;
+}
+h4 { /* Header 4 */
+  font-size: 14px;
+  color: Grey;
+}
+</style>
+# Introduction {-}
+
+Optical character recognition (OCR) is the process of converting scanned images of machine printed or
+handwritten text (numerals, letters, and symbols), into machine readable character streams, plain (e.g. text files) or formatted (e.g. HTML files). As shown in Figure 1, the data *workflow* in a typical OCR system consists of three major stages:
+
+* Pre-processing
+
+* OCR character recognition
+
+* Post-processing
+
+![](../figs/ocr_flowchart.png) 
+
+We have processed raw scanned images through the first two steps are relying on the [Tessearct OCR machine](https://en.wikipedia.org/wiki/Tesseract_(software)). R package tutorial can be found [here](https://www.r-bloggers.com/the-new-tesseract-package-high-quality-ocr-in-r/). 
+
+BUT this is not the FOCUS of this project!!!
+
+In this project, we are going to **focus on the third stage -- post-processing**, which includes two tasks: *error detection* and *error correction*.  
+
+We have processed raw scanned images through the first two steps are relying on the [Tessearct OCR machine](https://en.wikipedia.org/wiki/Tesseract_(software)). R package tutorial can be found [here](https://www.r-bloggers.com/the-new-tesseract-package-high-quality-ocr-in-r/). 
+
+BUT this is not the FOCUS of this project!!!
+
+In this project, we are going to **focus on the third stage -- post-processing**, which includes two tasks: *error detection* and *error correction*.  
+
+#Part I-Error Detection
+##Step 1 - Load library and source code
+```{r, warning=FALSE, message = FALSE}
+if (!require("devtools")) install.packages("devtools")
+if (!require("pacman")) {
+  ## devtools is required
+  library(devtools)
+  install_github("trinker/pacman")
+}
+
+library(tm)
+library(dplyr)
+library(stringdist)
+library(e1071)
+library(foreach)
+library(doParallel)
+library(parallelSVM)
+library(tidytext)
+library(tidyverse)
+library(DT)
+library(topicmodels)
+pacman::p_load(knitr, readr, stringr, tesseract, vecsets)
+source('../lib/ifCleanToken.R')
+file_name_vec <- list.files("../data/ground_truth") #100 files in total
+file_name_ocr <- list.files("../data/tesseract")
+options(warn=-1)
+```
+
+##Step 2 - Read ground_truth and tesseract file 
+```{r}
+source('../lib/readfile.R')
+
+##read the ground_truth 
+current_ground_truth_list <- lapply(file_name_vec,read_truth)
+##read the tesseract
+current_ocr_list <- lapply(file_name_ocr, read_ocr)
+
+paste_fun <- function(txt){
+  current_ground_truth_words=paste(txt,collapse=" ")
+  return(current_ground_truth_words)
+}
+```
+
+##Step 3 - Read in the  token list and feature list
+```{r}
+Features <- read.csv("../output/features.csv")
+SVM_output <- read.csv("../output/SVM_output.csv")
+data_final <- cbind(SVM_output,Features)
+data_final <- data_final[,-(4:6)]
+View(data_final)
+# sum(C$ground_truth==C$labels)/nrow(C)
+```
+
+##Step 8 - Output the detected error for correction
+```{r}
+
+error <- data_final[data_final$predicted==1,]
+index_all <- which(data_final$predicted==1,)
+
+non_error <- data_final[(data_final$predicted==0),]
+error_list <- list()
+index_list <- list()
+
+for(i in 1:100){
+  error_list[[i]] <- as.character(error[error$doc_id==i,"tokens"])
+  index_list[[i]] <- index_all[error$doc_id==i]
+}
+
+# for(i in 1:20){
+#   error_list_test[[i]] <- as.character(error_test[error_test$id==non_location[i],"ocrword"])
+#   index_list_test[[i]] <- index_test[error_test$id==non_location[i]]
+# }
+
+p1 <- "[[:punct:]]"
+p2 <- "[A-Z]"
+p3 <- "[0-9]"
+lo <- list()
+lo2 <- list()
+#error_uncleaned_test <- list()
+error_uncleaned <- list()
+#error_cleaned_test <- list()
+error_cleaned <- list()
+ground_truth_error <- list()
+ground_file <- list()
+#non_error_test_ocr <- list()
+f <- function(vector){
+  logic <- rep(FALSE,length(vector))
+  for(i in 1:length(vector)){
+    word <- vector[i]
+    s <- unlist(strsplit(word,split=""))
+    l1 <- grepl(p1,s)
+    l2 <- grepl(p2,s)
+    l3 <- grepl(p3,s)
+    l4 <- ifelse(nchar(word)==1,1,0)
+    if(sum(l1,l2,l3,l4)==0){
+      logic[i] = TRUE
+    }
+  }
+  return(logic) 
+}
+index_unselected <- list()
+# index_unselected_test <- list()
+index_selected <- list()
+# index_selected_test <- list()
+non_error <- list()
+non_error_ocr <- list()
+# non_error_test <- list()
+for(i in 1:100){
+  lo[[i]] <- f((error_list[[i]]))
+  error_cleaned[[i]] <- as.character(error_list[[i]][(lo[[i]])==TRUE])
+  error_uncleaned[[i]] <- as.character(error_list[[i]][(lo[[i]])==FALSE])
+  index_selected[[i]] <- index_list[[i]][(lo[[i]]==TRUE)]
+  index_unselected[[i]] <- index_list[[i]][(lo[[i]]==FALSE)]
+  #non_error[[i]] <- data_final[index_unselected[[i]],"truth_word"]
+  non_error_ocr[[i]] <- data_final[index_unselected[[i]],"tokens"]
+}
+
+# for(i in 1:20){
+#   lo2[[i]] <- f(error_list_test[[i]])
+#   error_cleaned_test[[i]] <- as.character(error_list_test[[i]][lo2[[i]]==TRUE])
+#   error_uncleaned_test[[i]] <- as.character(error_list_test[[i]][lo2[[i]]==FALSE])
+#   index_selected_test[[i]] <- index_list_test[[i]][(lo2[[i]]==TRUE)]
+#   index_unselected_test[[i]] <- index_list_test[[i]][(lo2[[i]]==FALSE)]
+#   non_error_test[[i]] <- data_error_test[index_unselected_test[[i]],"truth_word"]
+#   non_error_test_ocr[[i]] <- data_error_test[index_unselected_test[[i]],"ocrword"]
+# }
+
+#ground_file <- lapply(ground_truth_selected,paste_fun)
+#ground_file_test <- lapply(ground_truth_selected_test,paste_fun)
+#ocr_file_test <- lapply(ocr_selected_test,paste_fun)
+#save(error_uncleaned,file="../output/error_uncleaned.RData")
+#save(error_uncleaned_test,file="../output/error_uncleaned_test.RData")
+#save(index_unselected,file="../output/index_uncleaned.RData")
+#save(index_unselected_test,file="../output/index_uncleaned_test.RData")
+#save(ocr_file_test,file="../output/ocr_error_test.RData")
+#save(index_selected_test,file="../output/index_test.RData")
+#save(index_selected,file="../output/index_cleaned.RData")
+#save(error_cleaned,file="../output/error_list.RData")
+#save(ground_file,file="../output/ground_truth_error.RData")
+#save(error_cleaned_test,file="../output/error_list_test.RData")
+#save(ground_file_test,file="../output/ground_truth_error_test.RData")
+#save(ocr_selected,file="../output/ocr_selected.RData")
+```
+
+
+#PART II - Error correction
+##Step 1 - Remove numbers, punctuations,stopwords etc 
+```{r}
+
+lapply(paste("../data/ground_truth/",file_name_vec,sep=""),readLines,encoding="UTF-8")->truth_list
+
+
+pasteLines=function(current_ground_truth_txt)
+{
+current_ground_truth_words=paste(current_ground_truth_txt,collapse=" ")
+return(current_ground_truth_words)
+}
+
+
+lapply(truth_list,pasteLines)->truth_word_list
+
+
+#### remove numbers, punctuations etc 
+
+truth_corpus<-VCorpus(VectorSource(truth_word_list))%>%
+    tm_map(content_transformer(tolower))%>%
+    tm_map(removePunctuation)%>%
+    tm_map(removeNumbers)%>%
+    tm_map(removeWords, character(0))%>%
+    tm_map(stripWhitespace)
+
+dict <- tidy(truth_corpus) %>%
+  select(text)  
+
+
+#### remove stopwords
+data("stop_words")
+
+completed <- dict %>%
+  mutate(id = file_name_vec)  %>%
+  unnest_tokens(dictionary, text) %>%
+  anti_join(stop_words,by = c("dictionary" = "word")) ##149739 words
+
+
+bag_of_words <- completed%>%
+  select(dictionary)%>%
+  distinct()
+
+nrow(bag_of_words) #13593 bags of words 
+
+
+completed1 <- completed %>%
+  group_by(id) %>%
+  summarise(text = str_c(dictionary, collapse = " ")) %>%
+  ungroup()
+
+```
+
+
+
+##Step 2 -Training data for LDA
+```{r}
+#### get a freq matrix
+VCorpus(VectorSource(completed1$text))->cleaned_corpus
+DocumentTermMatrix(cleaned_corpus)->dtm
+#### set parameters and run
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+k=3
+
+LDA(dtm,k, method='Gibbs', control=list(nstart=nstart, seed = seed, best=best, burnin = burnin, iter = iter, thin=thin))->mod_5
+
+
+```
+
+
+##Step 3 - Get dictionary, dtm_test, dictionary_stop
+```{r}
+#load("../output/ground_test_noerror.RData")
+#load("../output/ocr_test_noerror.RData")
+#load("../output/index_cleaned.RData")
+#load("../output/error_uncleaned.RData")
+#load("../output/error_uncleaned_test.RData")
+#load("../output/index_uncleaned.RData")
+#load("../output/index_uncleaned_test.RData")
+#load("../output/ocr_error_test.RData")
+#load("../output/index_test.RData")
+#load("../output/error_list.RData")
+#load("../output/ground_truth_error.RData")
+#load("../output/error_list_test.RData")
+#load("../output/ground_truth_error_test.RData")
+#load("../output/ocr_selected.RData")
+#load("../output/post_topics.RData")
+
+dictionary=dtm$dimnames[[2]]
+
+dictionary_stop=c(dictionary,stop_words$word)
+```
+
+##Step 4 - Confusion Matrice and Pobability Pr(ljf|ljs) 
+```{r}
+sub<-matrix(c(0,0,6,1,388,0,4,1,103,0,1,2,1,2,91,0,0,0,11,3,20,0,2,0,0,0,0,0,5,10,0,15,1,8,0,1,2,10,3,7,1,11,0,14,8,4,0,0,2,0,0,0,7,9,0,13,3,0,11,0,0,1,8,1,7,6,1,1,1,0,27,9,0,7,1,0,2,0,1,9,16,0,11,3,11,3,0,9,4,4,8,5,3,2,0,30,33,42,0,0,0,2,0,7,342,2,0,12,0,1,9,0,146,0,1,0,0,3,116,0,0,12,35,7,44,0,1,0,15,0,0,2,9,0,2,0,2,0,0,0,1,4,2,0,0,6,0,2,4,5,0,3,0,0,0,0,0,3,5,5,2,5,0,0,1,1,2,5,0,1,0,5,27,2,0,19,0,0,0,0,1,0,2,1,0,5,0,2,0,0,0,0,5,6,6,19,0,0,0,8,1,5,0,0,2,0,7,0,118,0,0,0,89,0,0,0,0,0,0,13,0,1,25,2,0,2,0,0,64,0,0,0,15,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,9,0,0,1,1,0,0,0,0,0,0,1,0,1,2,0,0,1,2,0,0,0,1,4,4,2,0,0,5,0,0,0,0,1,0,0,0,0,5,0,3,3,3,3,0,6,2,0,0,4,35,0,2,0,8,27,14,0,1,0,0,0,7,0,11,7,7,0,4,0,12,0,1,5,0,0,78,0,7,0,4,0,9,0,0,0,0,2,5,3,5,9,3,5,1,0,14,0,0,0,14,180,0,0,6,0,20,6,5,2,0,0,0,0,0,76,0,1,0,93,0,2,2,49,0,2,2,0,0,0,15,0,1,1,5,43,1,0,0,6,0,0,10,10,1,0,0,1,3,0,0,0,5,6,7,14,0,0,14,7,6,0,0,7,0,1,0,0,0,2,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,5,43,14,6,5,3,0,0,0,11,0,28,2,1,0,0,14,11,4,0,6,0,7,2,35,2,39,30,12,4,13,1,2,5,6,10,9,5,4,3,0,12,0,37,0,8,3,9,36,21,9,1,40,22,6,12,21,11,1,0,0,2,15,7,14,6,0,22,15,0,0,3,3,0,8,3,9,0,1,0,15,0,0,0,47,0,0,0,13,0,39,0,0,4,0,0,0,0,1,0,5,0,0,0,3,0,0,0,0,0,0,0,0,0,3,0,0,4,0,0,0,2,0,0,0,0,0,0,1,8,7,4,1,2,1,2,2,0,4,0,2,1,0,1,0,0,5,19,2,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,2,2,0,0,0,1,3,0,0,0,0,0,1,0,5,0,1,2,18,0,3,0,15,0,0,0,3,0,18,0,0,0,20,7,8,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,1,6,0,0,0,0,0,0), nrow=26,ncol=26)
+
+rownames(sub)<-c("a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z")
+colnames(sub)<-c("a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z")
+
+prob<-sub/colSums(sub)
+```
+
+
+##Step 5 - Get pairs of diff letters from two words
+```{r}
+letterpair=function(error_word,dic_word)
+{
+  
+      n=nchar(error_word)
+      letter1=strsplit(error_word,split=NULL)%>%unlist()
+      letter2=strsplit(dic_word,split=NULL)%>%unlist()
+      ind=letter1!=letter2
+      
+      if(sum(ind)>2){return(NULL)}else{
+          letterpair=cbind(letter1[ind],letter2[ind])
+          colnames(letterpair)=c("mistake","true")
+          rownames(letterpair)=rep(dic_word,sum(ind))
+          return(letterpair)}
+    
+}
+
+```
+
+
+## Step 6 - Get product of Pr(ljf|ljs) 
+```{r}
+product<-function(lettermat,prob){
+  if(length(grep("[^a-z]",lettermat))>=1){return(NULL)}else{
+  return(prod(prob[lettermat]))}
+}
+
+
+```
+
+
+##Step 7 - Get probability of the word
+```{r}
+wordfreq=function(topic_model,candidates,post_coef){
+  word_freq=numeric(length(candidates))
+  candidates%in%stop_words$word->stopinds
+  candidates%in%dictionary->notstopinds
+  
+  dictionary%in%candidates->inds
+  wordfreq_topic=topic_model@beta[,inds]%>%exp()
+  
+  word_freq[notstopinds]=post_coef %*% wordfreq_topic
+  word_freq[stopinds]=1
+  return(word_freq)
+}
+
+
+```
+
+
+##Step 8 - Get best candidate for word error
+```{r}
+bestCandidate=function(error_word,filenumber)
+{
+  n=nchar(error_word)
+  
+  sapply(dictionary_stop[nchar(dictionary_stop)==n],letterpair,error_word)%>%plyr::compact()->candidates
+  
+  lapply(candidates,product,prob)%>%plyr::compact()%>%unlist()->letter_prob #1x3
+  topicProbabilities<-t(post_topics[filenumber,]) #1x5
+ 
+  word_freq=wordfreq(mod_5, names(candidates),as.matrix(topicProbabilities))
+  
+  scores=word_freq*letter_prob
+  best_candidate<-names(candidates)[which.max(scores)]
+  return(best_candidate)
+}
+
+
+```
+
+##Step 9 - Replace word error
+```{r}
+replace_error=function(error_vector,filenumber)
+{
+  sapply(error_vector,bestCandidate,filenumber)->postcorrection
+  return(postcorrection)
+}
+
+replace_all_file=function(error_list){
+  mapply(FUN=replace_error,error_list,filenumber=1:length(error_list))
+}
+
+#replace_all_file(error_cleaned_test)->correction_list
+
+#save(correction_list,file="../output/correction_list_updated.RData")
+```
+
+```{r}
+detected_errors<-read.csv('../output/detected_errors.csv')
+#Dealing with the character(0) value 
+# for(i in 1:20){
+#   l = correction_list[[i]]
+#   for(j in 1:length(l)){
+#     if(identical(l[[j]],character(0))){
+#       correction_list[[i]][[j]] <- names(correction_list[[i]][j])
+#     }
+#   }
+# }
+corrections <- as.character(unlist(detected_errors))
+#data_error_test_new <- data.frame(truth=as.character(data_error_test[,"truth_word"]),correct=as.character(data_error_test[,"ocrword"]))
+#data_error_test_new[,"correct"][as.vector((unlist(index_selected_test)))] <- corrections
+#data_error_test_new$ocrword[unlist(index_selected_test)] <- as.vector(corrections)
+#ground_truth_selected <- lapply(ground_truth_selected,paste_fun)
+# ground_file_test_corpus<-VCorpus(VectorSource(ground_truth_selected))
+# ground_file_test <- tidy(ground_file_test_corpus) %>%
+#   select(text)%>%
+#   unnest_tokens(dictionary, text) 
+
+# load("../output/index_test.RData")
+# 
+# corrected_file_test=ground_file_test$dictionary
+# truth <- corrected_file_test[unlist(index_selected_test)]
+# corrected_file_test[unlist(index_selected_test)] <- corrections
+```
+
+##Step 10 - Performance evaluation
+
+
+```{r}
+####################### Performance for Tesseract with Postprocessing ##############################
+ground_truth_selected_test_corpus<-VCorpus(VectorSource(ground_truth_selected_test))
+ground_truth_selected_test <- tidy(ground_truth_selected_test_corpus) %>%
+  select(text)%>%
+  unnest_tokens(dictionary, text) 
+ground_truth_selected_test <- ground_truth_selected_test$dictionary
+
+#### wordwise recall
+mean(ground_truth_selected_test==corrected_file_test)->wr
+#### wordwise precision
+ocr_selected_test_corpus<-VCorpus(VectorSource(ocr_selected_test))
+ocr_selected_test <- tidy(ocr_selected_test_corpus) %>%
+  select(text)%>%
+  unnest_tokens(dictionary, text) 
+ocr_selected_test$dictionary->ocr_selected_test
+
+sum(ground_truth_selected_test==corrected_file_test)/length(ocr_selected_test)->wp
+
+#### characterwise recall
+index_non <- which(unlist(lapply(ground_truth_selected_test,nchar))!=unlist(lapply(corrected_file_test,nchar)))
+list_ground <- unlist(lapply(ground_truth_selected_test,nchar))
+list_corrected <- unlist(lapply(corrected_file_test,nchar))
+for(i in (index_non)){
+  if(list_ground[i] > list_corrected[i]){
+    s = unlist(strsplit(ground_truth_selected_test[i],split=""))
+    diff = list_ground[i]-list_corrected[i]
+    ground_truth_selected_test[i] = paste(s[1:(list_ground[i]-diff)],collapse = "")
+  }
+  else{
+    s = unlist(strsplit(corrected_file_test[i],split=""))
+    diff = list_corrected[i]-list_ground[i]
+    corrected_file_test[i] = paste(s[1:(list_corrected[i]-diff)],collapse = "")
+  }
+}
+ground_truth_character=strsplit(ground_truth_selected_test,integer(0))%>%unlist()
+corrected_character=strsplit(corrected_file_test,integer(0))%>%unlist()
+
+mean(ground_truth_character==corrected_character)->cr
+
+#### characterwise precision
+ocr_test_character=strsplit(ocr_selected_test,integer(0))%>%unlist()
+sum(ground_truth_character==corrected_character)/length(ocr_test_character)->cp
+```
+
+```{r}
+################################### Performance for Tesseract ######################################
+
+### wordwise recall
+wr_tess <- mean(as.character(data_error_test$truth)==as.character(data_error_test$ocrword))
+### wordwise precision
+wp_tess <- sum(as.character(data_error_test$truth)==as.character(data_error_test$ocrword))/length(ocr_selected_test)
+
+### characterwise recall
+index_non_ocr <- which(nchar(as.character(data_error_test$truth_word))!=nchar(as.character(data_error_test$ocrword)))
+data_error_test_truth <- as.character(data_error_test$truth_word)
+data_error_test_ocr <- as.character(data_error_test$ocrword)                                    
+list_corrected_tess <- unlist(lapply(data_error_test_ocr,nchar))
+list_ground_tess <- unlist(lapply(data_error_test_truth,nchar))
+
+for(i in (index_non_ocr)){
+  if(list_ground_tess[i] > list_corrected_tess[i]){
+    s = unlist(strsplit(data_error_test_truth[i],split=""))
+    diff = list_ground_tess[i]-list_corrected_tess[i]
+    data_error_test_truth[i] = paste(s[1:(list_ground_tess[i]-diff)],collapse = "")
+  }
+  else{
+    s = unlist(strsplit(data_error_test_ocr[i],split=""))
+    diff = list_corrected_tess[i]-list_ground_tess[i]
+    data_error_test_ocr[i] = paste(s[1:(list_corrected_tess[i]-diff)],collapse = "")
+  }
+}
+
+data_error_test_s <- strsplit(data_error_test_truth,integer(0))%>%unlist()
+data_error_test_o <- strsplit(data_error_test_ocr,integer(0))%>%unlist()
+
+cr_tess <-  mean(data_error_test_s==data_error_test_o)
+
+### characterwise precision
+cp_tess <- sum(data_error_test_s==data_error_test_o)/length(ocr_test_character)
+
+OCR_performance_table <- data.frame("Tesseract" = rep(NA,4),
+                                    "Tesseract_with_postprocessing" = rep(NA,4))
+row.names(OCR_performance_table) <- c("word_wise_recall","word_wise_precision",
+                                      "character_wise_recall","character_wise_precision")
+OCR_performance_table["word_wise_recall","Tesseract"] <- wr_tess
+OCR_performance_table["word_wise_precision","Tesseract"] <-  wp_tess
+OCR_performance_table["character_wise_recall","Tesseract"] <- cr_tess
+OCR_performance_table["character_wise_precision","Tesseract"] <-  cp_tess
+OCR_performance_table["word_wise_recall","Tesseract_with_postprocessing"] <- wr
+OCR_performance_table["word_wise_precision","Tesseract_with_postprocessing"] <- wp 
+OCR_performance_table["character_wise_recall","Tesseract_with_postprocessing"] <- cr
+OCR_performance_table["character_wise_precision","Tesseract_with_postprocessing"] <- cp 
+kable(OCR_performance_table, caption="Summary of OCR performance")
+
+
+
+```
