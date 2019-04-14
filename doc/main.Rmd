@@ -10,7 +10,7 @@ output:
     number_sections: true
     code_folding: hide
 ---
-Group 10:
+Group 4:
 
 Xinyi, Ziyi, Sitong, Weixuan, Caihui
 
@@ -130,24 +130,41 @@ list <- completed$dictionary
 source('../lib/feature_extraction.R')
 Lb <- unlist(lapply(list,bigram)) #778458 elements
 LB <- data.frame(table(Lb))
+write.csv(LB, file = "../output/LB.csv")
 ```
 
 ### 3.1.2 Obtain ocr data and extract the features
 ```{r}
-tesseract_if_clean <- read.csv("../output/ocr_output.csv")
-head(tesseract_if_clean)
+tokens <- read.csv("../output/processed_tokens.csv")
+#LB <- read.csv("../output/LB.csv")
 
-feature_names <- paste("feature", 1:13)
-features <- matrix(nrow =nrow(tesseract_if_clean),  ncol = 13)
-for(i in 1:nrow(tesseract_if_clean)){
-  features[i,] <- tesseract_if_clean$tokens[i] %>% as.character() %>% findfeatures() 
-}
+feature_names <- paste("feature", 1:16)
 
+feature_2 <- matrix(nrow = nrow(tokens), ncol = 3)
+feature_5 <- matrix(nrow = nrow(tokens), ncol = 2)
+feature_1 <- feature_3 <- feature_4 <- feature_6 <-feature_7<- NULL
+feature_8 <- feature_9 <- feature_10 <-feature_11 <- feature_12 <- feature_13 <- NULL
+for(i in 1:nrow(tokens)){
+  feature_1[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat1()
+  feature_2[i,] <- tokens$ocr_tokens[i] %>% as.character() %>% feat2() 
+  feature_3[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat3()
+  feature_4[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat4()
+  feature_5[i,] <- tokens$ocr_tokens[i] %>% as.character() %>% feat5() 
+  feature_6[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat6() 
+  feature_7[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat7() 
+  feature_8[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat8() 
+  feature_9[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat9() 
+  feature_10[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat10()
+  feature_11[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat11()
+  feature_12[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat12()
+  feature_13[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat13()
+} 
+
+features <- cbind(feature_1, feature_2, feature_3, feature_4, feature_5, feature_6, feature_7, feature_8, feature_9, feature_10,feature_11, feature_12, feature_13)
 colnames(features) <- feature_names
-features <- cbind(tesseract_if_clean, features)
-
-# save(features, file="../output/features.RData")
-# write.csv(features, file="../output/features.csv")
+features <- cbind(tokens, features)
+save(features, file="../output/features.RData")
+write.csv(features, file="../output/features.csv", row.names = FALSE)
 # load("../output/features.RData")
 ```
 
