@@ -11,7 +11,7 @@ Summary: In this project, we developed a new method and improved the classificat
   Worked on text correction and performance measure ; collaborated with Sitong Liu, and Xinyi Chen; Helped with ReadMe.
  + Xinyi Chen:
   Worked on text correction and performance measure ; collaborated with Sitong Liu, and Caihui Xiao; Helped with ReadMe.
-   + Sitong Liu:
+ + Sitong Liu:
   Worked on text correction and performance measure; collaborated with Caihui Xiao, and Xinyi Chen; Presented final results in the class.
  + Weixuan Wu:
   Worked on data cleaning/preprocessing; trained and validated the SVM model for error detection; collaborated with Ziyi Liao on feature extraction. 
