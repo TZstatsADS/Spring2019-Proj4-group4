@@ -9,3 +9,5 @@ Summary: In this project, we developed a new method and improved the classificat
   Worked on feature extraction; collaborated with Weixuan Wu, completed the error detection process; Helped with ReadMe.
  + Caihui Xiao:
   Worked on text correction; collaborated with Sitong Liu, and Xinyi Chen; Helped with ReadMe.
+ + Weixuan Wu:
+  Worked on data cleaning/preprocessing; trained and validated the SVM model for error detection; collaborated with Ziyi Liao on feature extraction. 
