@@ -82,6 +82,7 @@ library(tidyverse)
 library(DT)
 library(topicmodels)
 library(tidyr)
+library(readr)
 pacman::p_load(knitr, readr, stringr, tesseract, vecsets)
 source('../lib/ifCleanToken.R')
 true_files <- list.files("../data/ground_truth") #100 files in total
@@ -193,7 +194,6 @@ combining <- function(txt){
 
 ##Step 3 - Read in the token list and feature list
 ```{r, message=FALSE, warning=FALSE}
-library(readr)
 Features <- read_csv("../output/features.csv") #read in the features outcome from detection
 #data <- read_csv("../output/svm_output.csv")
 svm_output <-read_csv("../output/svm_output.csv") #read in svm outcome
@@ -208,7 +208,6 @@ data_final$doc_id <- as.character(data_final$doc_id) #change type of doc_id to c
 
 ##Step 4 - Output the detected error for correction
 ```{r,  ,warning=FALSE, message = FALSE}
-
 #data<-read_csv("../output/SVM_output.csv")
 test_list=sample(true_files,floor(length(true_files)*0.25))
 train_list=true_files
@@ -318,7 +317,6 @@ ocr_selected_test <- ocr_selected[test_loc]
 ground_file <- lapply(ground_truth_selected,combining)
 ground_file_test <- lapply(ground_truth_selected_test,combining)
 ocr_file_test <- lapply(ocr_selected_test,combining)
-
 ```
 
 
@@ -371,10 +369,7 @@ completed1 <- completed %>%
   group_by(id) %>%
   summarise(text = str_c(dictionary, collapse = " ")) %>%
   ungroup()
-
 ```
-
-
 
 ##Step 6 -Training data for LDA
 ```{r ,warning=FALSE, message = FALSE}
@@ -391,8 +386,6 @@ best <- TRUE
 k=4
 
 LDA(dtm,k, method='Gibbs', control=list(nstart=nstart, seed = seed, best=best, burnin = burnin, iter = iter, thin=thin))->mod_4
-
-
 ```
 
 ```{r}
