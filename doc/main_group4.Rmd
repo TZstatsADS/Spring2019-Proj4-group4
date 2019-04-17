@@ -61,8 +61,6 @@ We have processed raw scanned images through the first two steps are relying on 
 BUT this is not the FOCUS of this project!!!
 
 In this project, we are going to **focus on the third stage -- post-processing**, which includes two tasks: *error detection* and *error correction*.  
-
-#Error Correction Part
 ##Step 1 - Load library and source code
 ```{r, warning=FALSE, message = FALSE}
 if (!require("devtools")) install.packages("devtools")
@@ -83,12 +81,86 @@ library(tidytext)
 library(tidyverse)
 library(DT)
 library(topicmodels)
+library(tidyr)
 pacman::p_load(knitr, readr, stringr, tesseract, vecsets)
 source('../lib/ifCleanToken.R')
 true_files <- list.files("../data/ground_truth") #100 files in total
 ocr_files <- list.files("../data/tesseract")
 options(warn=-1)
+file_name_vec <- list.files("../data/ground_truth") #100 files in total
 ```
+
+# Error detection
+## Step1 Use train data to create LB corpus
+```{r}
+set.seed(2019)
+train_index <- sample(1:100, 80, replace = F)
+# bigr_list: a list of 80 file names
+bigr_list <- file_name_vec[train_index]
+read_txt <- function(file_name){
+  current_file_name <- sub(".txt","",file_name)
+  current_ground_truth <- readLines(paste("../data/ground_truth/",current_file_name,".txt",sep=""), encoding="UTF-8",warn=FALSE)
+  return(current_ground_truth)
+}
+
+bigr_lib <- lapply(bigr_list, read_txt)
+  
+corpus<-VCorpus(VectorSource(bigr_lib))%>%
+    tm_map(content_transformer(tolower))%>%
+    tm_map(removePunctuation)%>%
+    tm_map(removeNumbers)%>%
+    tm_map(removeWords, character(0))%>%
+    tm_map(stripWhitespace)
+dict <- tidy(corpus) %>%
+  select(text)  
+data("stop_words")
+completed <- dict %>%
+  mutate(id = bigr_list)  %>%
+  unnest_tokens(dictionary, text) %>%
+  anti_join(stop_words,by = c("dictionary" = "word")) 
+list <- completed$dictionary
+source('../lib/feature_extraction.R')
+Lb <- unlist(lapply(list,bigram)) #778458 elements
+LB <- data.frame(table(Lb))
+write.csv(LB, file = "../output/LB.csv")
+```
+
+## Step2: Obtain ocr data and extract the features
+```{r}
+tokens <- read.csv("../output/processed_tokens.csv")
+#LB <- read.csv("../output/LB.csv")
+
+feature_names <- paste("feature", 1:16)
+
+feature_2 <- matrix(nrow = nrow(tokens), ncol = 3)
+feature_5 <- matrix(nrow = nrow(tokens), ncol = 2)
+feature_1 <- feature_3 <- feature_4 <- feature_6 <-feature_7<- NULL
+feature_8 <- feature_9 <- feature_10 <-feature_11 <- feature_12 <- feature_13 <- NULL
+for(i in 1:nrow(tokens)){
+  feature_1[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat1()
+  feature_2[i,] <- tokens$ocr_tokens[i] %>% as.character() %>% feat2() 
+  feature_3[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat3()
+  feature_4[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat4()
+  feature_5[i,] <- tokens$ocr_tokens[i] %>% as.character() %>% feat5() 
+  feature_6[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat6() 
+  feature_7[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat7() 
+  feature_8[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat8() 
+  feature_9[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat9() 
+  feature_10[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat10()
+  feature_11[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat11()
+  feature_12[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat12()
+  feature_13[i] <- tokens$ocr_tokens[i] %>% as.character() %>% feat13()
+} 
+
+features <- cbind(feature_1, feature_2, feature_3, feature_4, feature_5, feature_6, feature_7, feature_8, feature_9, feature_10,feature_11, feature_12, feature_13)
+colnames(features) <- feature_names
+features <- cbind(tokens, features)
+save(features, file="../output/features.RData")
+write.csv(features, file="../output/features.csv", row.names = FALSE)
+# load("../output/features.RData")
+```
+
+#Error Correction Part
 
 ##Step 2 - Read ground_truth and tesseract file 
 ```{r}
@@ -504,7 +576,4 @@ OCR_performance_table["word_wise_precision","Tesseract_with_postprocessing"] <- 
 OCR_performance_table["character_wise_recall","Tesseract_with_postprocessing"] <- cr
 OCR_performance_table["character_wise_precision","Tesseract_with_postprocessing"] <- cp 
 kable(OCR_performance_table, caption="Summary of OCR performance")
-
-
-
 ```
