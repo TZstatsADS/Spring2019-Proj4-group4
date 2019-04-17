@@ -7,3 +7,5 @@ Summary: In this project, we developed a new method and improved the classificat
 [Contribution Statement] 
  + Ziyi Liao:
   Worked on feature extraction; collaborated with Weixuan Wu, completed the error detection process; Helped with ReadMe.
+ + Caihui Xiao:
+  Worked on text correction; collaborated with Sitong Liu, and Xinyi Chen; Helped with ReadMe.
