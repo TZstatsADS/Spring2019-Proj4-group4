@@ -92,7 +92,7 @@ file_name_vec <- list.files("../data/ground_truth") #100 files in total
 
 # Error detection
 ## Step1 Use train data to create LB corpus
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 set.seed(2019)
 train_index <- sample(1:100, 80, replace = F)
 # bigr_list: a list of 80 file names
@@ -126,7 +126,7 @@ write.csv(LB, file = "../output/LB.csv")
 ```
 
 ## Step2: Obtain ocr data and extract the features
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 tokens <- read.csv("../output/processed_tokens.csv")
 #LB <- read.csv("../output/LB.csv")
 
@@ -163,7 +163,7 @@ write.csv(features, file="../output/features.csv", row.names = FALSE)
 #Error Correction Part
 
 ##Step 2 - Read ground_truth and tesseract file 
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 #function to read in ground_truth data
 read_truth <- function(file_name){
   current_name <- sub(".txt","",file_name)
@@ -207,7 +207,7 @@ data_final$doc_id <- as.character(data_final$doc_id) #change type of doc_id to c
 ```
 
 ##Step 4 - Output the detected error for correction
-```{r, warning= FALSE}
+```{r,  ,warning=FALSE, message = FALSE}
 
 #data<-read_csv("../output/SVM_output.csv")
 test_list=sample(true_files,floor(length(true_files)*0.25))
@@ -323,7 +323,7 @@ ocr_file_test <- lapply(ocr_selected_test,combining)
 
 
 ##Step 5 - Remove numbers, punctuations,stopwords etc 
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 
 lapply(paste("../data/ground_truth/",true_files,sep=""),readLines,encoding="UTF-8")->truth_list
 
@@ -377,7 +377,7 @@ completed1 <- completed %>%
 
 
 ##Step 6 -Training data for LDA
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 #### get a freq matrix
 VCorpus(VectorSource(completed1$text))->cleaned_corpus
 DocumentTermMatrix(cleaned_corpus)->dtm
@@ -407,14 +407,14 @@ for (i in 1:25){
 ```
 
 ##Step 7 - Get dictionary, dtm_test, dictionary_stop
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 dictionary=dtm$dimnames[[2]]
 
 dictionary_stop=c(dictionary,stop_words$word)
 ```
 
 ##Step 8 - Confusion Matrice and Pobability Pr(ljf|ljs) 
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 hhh<-read.csv('../data/sub_matrix.csv')
 hhh <- hhh[,2:27] 
  sub<- matrix(as.numeric( unlist(matrix(hhh,26,26))),26,26)
@@ -426,7 +426,7 @@ prob<-sub/colSums(sub)
 ```
 
 ###Step 9 - Replace word error
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 # source("../lib/Functions.R")
 # replace_all_file(error_cleaned_test)->correction_list
 # 
@@ -467,7 +467,7 @@ corrected_file_test[unlist(index_selected_test)] <- corrections
 ##Step 10 - Performance evaluation
 
 
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 ####################### Performance for Tesseract with Postprocessing ##############################
 ground_truth_selected_test_corpus<-VCorpus(VectorSource(ground_truth_selected_test))
 ground_truth_selected_test <- tidy(ground_truth_selected_test_corpus) %>%
@@ -528,7 +528,7 @@ sum(ground_truth_character==corrected_character)/length(ocr_test_character)->cp
 
 ```
 
-```{r}
+```{r ,warning=FALSE, message = FALSE}
 ################################### Performance for Tesseract ######################################
 load("../output/ocr_test_character.RData")
 ### wordwise recall
